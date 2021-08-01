@@ -1,0 +1,217 @@
+---
+title: "Proj3 work"
+author: "Dionte Watie"
+date: "7/30/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(caret)
+library(plotly)
+library(ggplot2)
+library(randomForest)
+library(mathjaxr)
+```
+
+
+```{r}
+collegeBall <- read.csv("cbb19.csv")
+
+as.tibble(collegeBall)
+
+
+wccB10 <- collegeBall %>% select(TEAM, CONF, G, W, X2P_O, X2P_D, X3P_O, X3P_D, TOR, TORD) %>% filter(CONF == c("WCC", "B10")) 
+wccB10
+
+
+
+write.csv(wccB10, "wccB10.csv")
+```
+
+
+```{r}
+gmes <- ggplot(wccB10, aes(x = CONF, y = G))
+gmes + geom_bar(stat = "identity")
+```
+
+
+
+```{r}
+wins <- ggplot(wccB10, aes(x = CONF, y = W))
+wins + geom_bar(position = "dodge", stat = "identity", aes(fill = TEAM))
+```
+
+
+
+```{r}
+Teams <- ggplot(wccB10, aes(x = G))
+Teams + geom_density(aes(fill = CONF), alpha = 0.5, kernel = "gaussian")
+```
+
+
+```{r}
+plot_ly(wccB10, x = ~X3P_O, color = ~CONF, type = "box")
+```
+
+
+
+
+```{r}
+confWins <- wccB10 %>% group_by(CONF) %>% 
+                       summarise(Min = min(W),
+                                 Med = median(W), 
+                                 Avg = mean(W), 
+                                 Max = max(W), 
+                                 StDev = sd(W))
+
+confTwo <- wccB10 %>% group_by(CONF) %>%
+                      summarise(Min = min(X2P_O),
+                                Med = median(X2P_O), 
+                                Avg = mean(X2P_O), 
+                                Max = max(X2P_O), 
+                                StDev = sd(X2P_O))
+
+confThree <- wccB10 %>% group_by(CONF) %>%
+                        summarise(Min = min(X3P_O),
+                                  Med = median(X3P_O), 
+                                  Avg = mean(X3P_O), 
+                                  Max = max(X3P_O), 
+                                  StDev = sd(XP_O))
+```
+
+
+```{r}
+
+
+set.seed(1)
+train <- sample(1:nrow(wccB10), size = nrow(wccB10)*0.7)
+test <- dplyr::setdiff(1:nrow(wccB10), train)
+wccB10Train <- wccB10[train, ]
+wccB10Test <- wccB10[test, ]
+
+wccB10Train
+
+train2 <- sample(1:nrow(wccB10), size = nrow(wccB10)*0.8)
+test2 <- dplyr::setdiff(1:nrow(wccB10), train)
+wccB10Train2 <- wccB10[train, ]
+wccB10Test2 <- wccB10[test, ]
+
+wccB10TrainA <-wccB10Train %>% select(CONF, G, W, X2P_O, X2P_D, X3P_O, X3P_D, TOR, TORD)
+wccB10TestA <- wccB10Test %>% select(CONF, G, W, X2P_O, X2P_D, X3P_O, X3P_D, TOR, TORD)
+
+wccB10Train2B <-wccB10Train2 %>% select(CONF, G, W, X2P_O, X2P_D, X3P_O, X3P_D, TOR, TORD)
+wccB10Test2B <- wccB10Test2 %>% select(CONF, G, W, X2P_O, X2P_D, X3P_O, X3P_D, TOR, TORD)
+```
+
+```{r}
+set.seed(1)
+
+
+rfFit <- train(W ~ G + X2P_O + X3P_O + TORD + CONF, 
+               method = "rf",
+               trControl = trainControl(method = "repeatedcv",
+                                        repeats = 3,
+                                        number = 10),
+                                        linout = TRUE,
+                                        tuneGrid = data.frame(mtry = 1:10),
+                                        data = wccB10TrainA)
+rfFit
+
+rfPred <- predict(rfFit,  newdata = dplyr::select(wccB10TrainA,-W))
+rfPred
+rfRM <- postResample(rfPred, wccB10TestA$W)
+rfRM
+
+
+rfFit2 <- train(W ~ G + X2P_O + X3P_O + TORD + CONF, 
+               method = "rf",
+               trControl = trainControl(method = "repeatedcv",
+                                        repeats = 3,
+                                        number = 10),
+                                        linout = TRUE,
+                                        tuneGrid = data.frame(mtry = 1:10),
+                                        data = wccB10Train2B)
+rfFit2
+
+rfPred2 <- predict(rfFit,  newdata = dplyr::select(wccB10Train2B,-W))
+rfPred2
+rfRM2 <- postResample(rfPred, wccB10Test2B$W)
+rfRM2
+```
+
+```{r}
+bic_selection = step(
+  lm(W ~ 1, wccB10TrainA),
+  scope = W ~ CONF + G + X2P_O + X2P_D + X3P_O + X3P_D + TOR + TORD,
+  direction = "both", k = log(nrow(wccB10TrainA))
+)
+bestLm <- lm(W ~ G + X2P_O + X3P_O + TORD + CONF, data = wccB10TrainA)
+bestLm
+summary(bestLm)
+
+
+bic_selection = step(
+  lm(W ~ 1, wccB10Train2B),
+  scope = W ~ CONF + G + X2P_O + X2P_D + X3P_O + X3P_D + TOR + TORD,
+  direction = "both", k = log(nrow(wccB10Train2B))
+)
+bestLm2 <- lm(W ~  G + X2P_O + X3P_O + TORD + CONF, data = wccB10Train2B)
+summary(bestLm2)
+
+
+
+
+bestLmFit <-train(W ~  G + X2P_O + X3P_O + TORD + CONF, data = wccB10TrainA , 
+         method = "lm", 
+         preProcess = c("center", "scale"),
+         trControl = trainControl(method = "cv", number = 10))
+bestLmFit
+lmFitPred <- predict(bestLmFit, newdata = dplyr::select(wccB10TestA,-W))
+
+lmRM <- postResample(lmFitPred, wccB10TestA$W)
+lmRM
+
+
+bestLmFit2 <-train(W ~  G + X2P_O + X3P_O + TORD + CONF, data = wccB10Train2B , 
+         method = "lm", 
+         preProcess = c("center", "scale"),
+         trControl = trainControl(method = "cv", number = 10))
+bestLmFit2
+lmFitPred2 <- predict(bestLmFit2, newdata = dplyr::select(wccB10Test2B,-W))
+
+lmRM2 <- postResample(lmFitPred2, wccB10Test2B$W)
+lmRM2
+
+```
+
+
+```{r}
+trCtrl <- trainControl(method = "repeatedcv", number = 10, repeats =3)
+set.seed(1)
+ClassFit <- train(W ~ G + X2P_O + X3P_O + TORD + CONF, data = wccB10TrainA,
+                     method = "rpart",
+                     preProcess = c("center", "scale"),
+                     trControl = trCtrl)
+ClassFit
+ClassFitPred <- predict(ClassFit, newdata = dplyr::select(wccB10TestA,-W))
+classRM <- postResample(ClassFitPred, wccB10TestA$W)
+classRM
+
+
+ClassFit2 <- train(W ~ G + X2P_O + X3P_O + TORD + CONF, data = wccB10Train2B,
+                     method = "rpart",
+                     preProcess = c("center", "scale"),
+                     trControl = trCtrl)
+ClassFit2
+ClassFitPred2 <- predict(ClassFit2, newdata = dplyr::select(wccB10Test2B,-W))
+classRM2 <- postResample(ClassFitPred2, wccB10Test2B$W)
+classRM2
+
+
+```
+
