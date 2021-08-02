@@ -17,7 +17,7 @@ library(randomForest)
 library(mathjaxr)
 
 # Define UI for application that draws a histogram
-ui <- dashboardPage(
+shinyUI(dashboardPage(
     dashboardHeader(title = "WCC & B10 Basketball 2019"),
     dashboardSidebar(
         menuItem("About", tabName = "about", icon = icon("th")),
@@ -27,13 +27,34 @@ ui <- dashboardPage(
     ),
     dashboardBody(
         # Boxes need to be put in a row (or column)
-        fluidRow(
-            box(plotOutput("plot1", height = 250)),
+        tabItems(
+            tabItem(tabName = "data",
+                fluidRow(
+                    box(dataTableOutput("wccB10Table")))),
             
-            box(
-                title = "Controls",
-                sliderInput("slider", "Number of observations:", 1, 100, 50)
+            tabItem(tabName = "dataExpl",
+                fluidRow(
+                    box(selectInput("plotnum", "Distributions:", 
+                                     c("Total Games Played by Conference" = "gmesPlot",
+                                       "Density Plot of Games Played by Conference" 
+                                       = "densityPlot",
+                                       "Wins by Team and Conference" = "winsPlot",
+                                       "3pt Percentage by Conference" = "boxPlot"))),
+                    
+                    box(plotOutput("plots"))),
+                
+                    box(dataTableOutput("confsumms")),
+                    
+                    box(selectInput("datasums", "Summary Statistics: ", 
+                                    c("Summary of Wins by Conference" = "confWins",
+                                      "Summary of 2PT Percentages" = "confTwo",
+                                      "Summary of 3PT Percentages" = "confThree",
+                                      "Summary of Turnover Forced" = "confTor"))),
+                
+                    ))
+                )    
+                    
+                    
+                    )        
             )
-        )
-    )
-)
+
